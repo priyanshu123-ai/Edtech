@@ -1,55 +1,52 @@
 const User = require("../models/User");
-const OTP = require("../models/OTP")
-const otpGenerator = require("otp-generator")
-
-
+const OTP = require("../models/OTP");
+const otpGenerator = require("otp-generator");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 //sendOTP
 
-exports.sendOTP = async(req,res) => {
+exports.sendOTP = async (req, res) => {
+  try {
+    //fetch email from request ki body
 
-  try{
-      //fetch email from request ki body
-
-    const {email} = req.body;
+    const { email } = req.body;
 
     //check if user already exist
 
-    const checkUserPresent = await User.findOne({email});
+    const checkUserPresent = await User.findOne({ email });
 
     //if user already exist,then return a response
 
-    if(checkUserPresent){
-        return res.status(401).json({
-            success:false,
-            message:"User already exist",
-        })
+    if (checkUserPresent) {
+      return res.status(401).json({
+        success: false,
+        message: "User already exist",
+      });
     }
 
     //generate otp
 
-    let otp = otpGenerator(6,{
-        upperCaseAlphabets:false,
-        lowerCaseAlphabets:false,
-        specialChars:false,
+    let otp = otpGenerator(6, {
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
     });
-    console.log("OTP generated : ",otp);
+    console.log("OTP generated : ", otp);
 
     //check unique otp or not
-    const result = await OTP.findOne({otp:otp});
+    const result = await OTP.findOne({ otp: otp });
 
-    while(result){
-        otp = otpGenerator(6,{
-            upperCaseAlphabets:false,
-            lowerCaseAlphabets:false,
-            specialChars:false,
-
-
-        })
-         result = await OTP.findOne({otp:otp});
+    while (result) {
+      otp = otpGenerator(6, {
+        upperCaseAlphabets: false,
+        lowerCaseAlphabets: false,
+        specialChars: false,
+      });
+      result = await OTP.findOne({ otp: otp });
     }
 
-    const otpPayload = {email,otp};
+    const otpPayload = { email, otp };
 
     //create an entry for OTP
 
@@ -58,87 +55,156 @@ exports.sendOTP = async(req,res) => {
 
     //return response successful
     res.status(200).json({
-        success:true,
-        message:'OTP Sent Successfully',
-        otp,
-    })
-  }catch(error){
+      success: true,
+      message: "OTP Sent Successfully",
+      otp,
+    });
+  } catch (error) {
     console.log(error);
     return res.status(500).json({
-        success:false,
-        message: error.message,
-        
-    })
-    
-
-}
-
-}
-
-
-
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 //signup
 
-exports.signUp = async (req,res) => {
-    //data fetch from request ki body
+exports.signUp = async (req, res) => {
+  //data fetch from request ki body
 
+  try {
     const {
-        firstName,
-        lastName,
-        email,
-        password,
-        conformPassword,
-        accountType,
-        otp
+      firstName,
+      lastName,
+      email,
+      password,
+      conformPassword,
+      accountType,
+      contactNumber,
+      otp,
     } = req.body;
 
     //validate krlo
 
-    if(!firstName || !lastName || !email || !password || !conformPassword || !otp){
-        return res.status(403).json({
-            success:false,
-            message:"All fields are required",
-        })
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !conformPassword ||
+      !otp
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "All fields are required",
+      });
     }
 
     //2 passwordmatch karlo
-    if(password !== conformPassword){
-        return res.status(400).json({
-            success:false,
-            message:"Password and conformPassword value does not match, please try again",
-        });
+    if (password !== conformPassword) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password and conformPassword value does not match, please try again",
+      });
     }
 
     //check user already exist or not
 
-    const existingUser = await User.findOne({email});
+    const existingUser = await User.findOne({ email });
 
-    if(existingUser){
-        return res.status(400).json({
-            success:false,
-            message:'User is already registered',
-        });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User is already registered",
+      });
     }
 
     //find most recent OTP stored for the user
-    const recentOtp = await OTP.find({email}).sort({createdAt:-1}).limit(1);
+    const recentOtp = await OTP.find({ email })
+      .sort({ createdAt: -1 })
+      .limit(1);
     console.log(recentOtp);
     //validate OTP
 
-    if(recentOtp.length==0){
-        //OTP not found
-        return res.status(400).json({
-            success:false,
-            message:"OTP Found",
-        })
+    if (recentOtp.length == 0) {
+      //OTP not found
+      return res.status(400).json({
+        success: false,
+        message: "OTP Found",
+      });
+    } else if (otp !== recentOtp) {
+      //Invalid OTP
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
     }
 
+    //Hash password
 
-}
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    //entry create in DB
+
+    const profileDetails = await Profile.create({
+      gender: null,
+      dateOfBirth: null,
+      about: null,
+      contactNumber: null,
+    });
+
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      contactNumber,
+      password: hashedPassword,
+      accountType,
+      additionalDetails: profileDetails._id,
+      image: `https://api.dicebear.com/5.x/initials/svg?seed=${firstName} ${lastName}`,
+    });
+    //return res
+
+    return res.status(200).json({
+      success: true,
+      message: "User is registered Successfully",
+      user,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 //LOGIN
+exports.login = async (req,res) => {
+    try{
+        //get data from req body
+        const {email,password} = req.body;
+        //validation data
+        if(!email || !password){
+            return res.status(403).json({
+                success:false,
+                message:"All fields are required, please try again",
+            })
+        }
+
+        //user check exist or not
+        const user = await User.findOne({email}).populate("additionalDetails");
+        if(!user){
+
+        }
 
 
+    }catch(error){
+
+    }
+}
 
 //changePassword
