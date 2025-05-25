@@ -3,6 +3,8 @@ const OTP = require("../models/OTP");
 const otpGenerator = require("otp-generator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+require("dotenv").config();
+const mail = require("../utils/mailSender");
 
 //sendOTP
 
@@ -198,13 +200,127 @@ exports.login = async (req,res) => {
         //user check exist or not
         const user = await User.findOne({email}).populate("additionalDetails");
         if(!user){
+            return res.status(401).json({
+                success:false,
+                message:"User is not registered,please signup first",
 
-        }
+            })
+          }
+            //generate JWT, after password matching
+            if(await bcrypt.compare(password,user.password)){
+                const payload = {
+                    email:user.email,
+                    id:user._id,
+                    role:user.role,
+                }
+
+                const token = jwt.sign(payload,process.env.JWT_SECRET,{
+                  expiresIn:"2h",
+                });
+                user.token = token;
+                user.password=undefined;
+
+                //create cookie and send response
+                const options = {
+                  expires:new Date(Date.now() + 3*24*60*60*1000),
+                  httpOnly:true,
+                }
+
+                res.cookie("token",token,options).status(200).json({
+                  success:true,
+                  token,
+                  user,
+                  message:"Logged in Successfully",
+                })
+            }else{
+              return res.status(401).json({
+                success:false,
+                message:"Password is Incorrect",
+              })
+            }
+
+        
 
 
     }catch(error){
+      console.log(error);
+      return res.status(500).json({
+        success:false,
+
+        message:"Login Failure, Please try again",
+      })
 
     }
 }
 
 //changePassword
+
+exports.changePassword = async(req,res) => {
+ try{
+  const {email} = req.user;
+  const {password,newPassword,conformPassword} = req.body;
+  //validate all fields
+  if(!password || !newPassword || !conformPassword){
+    return res.status(400).json({
+      success:false,
+      message:"All fields are required",
+    });
+  }
+
+  //check new password match
+  if(newPassword!==conformPassword){
+    return res.status(400).json({
+      success:false,
+      message:"New Password and Confirm Password do not match",
+    });
+  }
+
+  //Find user
+  const user = await User.findOne({email});
+  if(!user){
+    return res.status(404).json({
+      success:false,
+      message:"User not found",
+    })
+  }
+
+  //check old password
+  const isMatch = await bcrypt.compare(password,user.password);
+  if(!isMatch){
+    return res.status(401).json({
+      success:false,
+      message:"Old password is incorect",
+    })
+  }
+
+  //Hash new password and update
+  const hashedPassword = await bcrypt.hash(newPassword,10);
+  user.password = hashedPassword;
+  await user.save();
+
+  //Send mail - password updated
+
+  await mail(
+    user.email,
+    "Password Changed Successfully",
+    "Your password has been updated Successfully"
+  )
+
+  //Return response
+
+  return res.status(200).json({
+    success:true,
+    message:"Password updated Successfully",
+  })
+
+
+
+ }catch(error){
+  console.log(error);
+  return res.status(500).json({
+    success:false,
+    message:"Something went wrong,please try again"
+  })
+
+ }
+} 
