@@ -1,8 +1,8 @@
-const Tag = require("../models/tags");
+const Categorys = require("../models/Categorys");
 
 //create Tag ka handler function
 
-exports.createTag = async (req,res) => {
+exports.createCategory = async (req,res) => {
     try{
         //fetch data
         const {name,description} = req.body;
@@ -14,11 +14,11 @@ exports.createTag = async (req,res) => {
             })
         }
         //create entry in db
-        const tagDetails = await Tag.create({
+        const CategorysDetails = await Categorys.create({
             name:name,
             description:description,
         })
-        console.log(tagDetails);
+        console.log(CategorysDetails);
 
         //return response
 
