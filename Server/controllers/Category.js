@@ -30,3 +30,24 @@ exports.createCategory = async (req,res) => {
 
     }
 }
+
+
+//getAlltags handler function
+
+exports.showCategory = async(req,res) => {
+    try{
+        const allCategory = await Categorys.find({},{name : true,description:true});
+        res.status(200).json({
+            success:true,
+            message:"Message Successfully",
+            allCategory
+        })
+
+    }catch(error){
+          return res.status(500).json({
+            success:false,
+            message:error.message,
+        })
+
+    }
+}

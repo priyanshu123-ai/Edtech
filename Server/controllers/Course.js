@@ -82,7 +82,7 @@ exports.createCourse = async (req, res) => {
     );
 
     //update the Tag ka schema
-    await Tag.findByIdAndUpdate(
+    await Categorys.findByIdAndUpdate(
       tagDetails._id,
       { $push: { courses: newCourse._id } },
       { new: true }
