@@ -1,75 +1,69 @@
 const SubSection = require("../models/SubSection");
 const Section = require("../models/Section");
-const {uploadImageToCloudinary} = require("../utils/imageUploader");
-
+const { uploadImageToCloudinary } = require("../utils/imageUploader");
 
 //createSubSection
 
-exports.SubSection = async (req,res) => {
-    try{
+exports.SubSection = async (req, res) => {
+  try {
+    //fetch data from Req body
+    const { sectionId, title, timeDuration, description } = req.body;
 
-        //fetch data from Req body
-        const {sectionId,title,timeDuration,description} = req.body;
+    //extract file/video
+    const video = req.files.videoFile;
 
-        //extract file/video
-        const video = req.files.videoFile;
-
-        //validation
-        if(!sectionId||!title || !timeDuration||!description){
-            return res.status(400).json({
-                success:false,
-                message:"All files are required"
-            })
-        }
-
-        //upload video to cloudinary
-        const uploadDetails = await uploadImageToCloudinary(video,process.env.FOLDER_NAME);
-
-        //create a sub-section
-        const subSectionDetails = await SubSection.create({
-            title:title,
-            timeDuration:timeDuration,
-            description:description,
-            videoUrl:uploadDetails.secure_url,
-        })
-
-        //update section with this sub section ObejtId
-
-        const updatedSection = await Section.findByIdAndUpdate({_id:sectionId},
-            {
-                $push:{
-                    subSection:subSectionDetails._id,
-                }
-            },
-            {new:true}
-        ).populate('subSection');
-        //HW: log updated section here,after adding populate query
-        
-
-        //return res
-
-        return res.status(200).json({
-            success:true,
-            message:'Sub Section Created Successfully',
-            updatedSection
-        })
-
-
-
-
-    }catch(error){
-        return res.status(500).json({
-            success:false,
-            message:"Internal Server Error",
-            error:error.message,
-        })
-
-
+    //validation
+    if (!sectionId || !title || !timeDuration || !description) {
+      return res.status(400).json({
+        success: false,
+        message: "All files are required",
+      });
     }
-}
+
+    //upload video to cloudinary
+    const uploadDetails = await uploadImageToCloudinary(
+      video,
+      process.env.FOLDER_NAME
+    );
+
+    //create a sub-section
+    const subSectionDetails = await SubSection.create({
+      title: title,
+      timeDuration: timeDuration,
+      description: description,
+      videoUrl: uploadDetails.secure_url,
+    });
+
+    //update section with this sub section ObejtId
+
+    const updatedSection = await Section.findByIdAndUpdate(
+      { _id: sectionId },
+      {
+        $push: {
+          subSection: subSectionDetails._id,
+        },
+      },
+      { new: true }
+    ).populate("subSection");
+    //HW: log updated section here,after adding populate query
+
+    //return res
+
+    return res.status(200).json({
+      success: true,
+      message: "Sub Section Created Successfully",
+      updatedSection,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
 
 //HW : updatesubSection
-
 
 // Controller to update a subsection
 exports.updateSubSection = async (req, res) => {
@@ -125,33 +119,31 @@ exports.updateSubSection = async (req, res) => {
   }
 };
 
-
 //HW : deleteSubSection
 
 exports.deleteSubSection = async (req, res) => {
-    try {
-        const { subSectionId, sectionId } = req.params;
+  try {
+    const { subSectionId, sectionId } = req.params;
 
-        // 1. Delete the sub-section
-        await SubSection.findByIdAndDelete(subSectionId);
+    // 1. Delete the sub-section
+    await SubSection.findByIdAndDelete(subSectionId);
 
-        // 2. Remove its reference from Section's subSection array
-        await Section.findByIdAndUpdate(
-            sectionId,
-            { $pull: { subSection: subSectionId } },
-            { new: true }
-        )
+    // 2. Remove its reference from Section's subSection array
+    await Section.findByIdAndUpdate(
+      sectionId,
+      { $pull: { subSection: subSectionId } },
+      { new: true }
+    );
 
-        return res.status(200).json({
-            success: true,
-            message: "SubSection deleted successfully"
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: "Something went wrong while deleting",
-            error: error.message
-        });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "SubSection deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while deleting",
+      error: error.message,
+    });
+  }
 };
